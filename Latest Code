@@ -2,11 +2,19 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <iomanip>
-#include <sys/stat.h>
 #include <algorithm>
+#include <utility>
+#include <cstdlib>
 
 using namespace std;
+
+void clearScreen() {
+    #ifdef _WIN32
+    system("cls");
+    #else
+    system("clear");
+    #endif
+}
 
 struct MenuItem {
     string nama;
@@ -50,671 +58,693 @@ struct Voucher {
     bool digunakan;
 };
 
-vector<MenuItem> menuList;
-vector<Transaksi> trxList;
-vector<Pengeluaran> pengList;
-vector<Member> memberList;
-vector<Diskon> diskonList;
-vector<Voucher> voucherList;
-vector<pair<string,int>> keranjang;
+class WartegApp {
+private:
+    vector<MenuItem> menuList;
+    vector<Transaksi> trxList;
+    vector<Pengeluaran> pengList;
+    vector<Member> memberList;
+    vector<Diskon> diskonList;
+    vector<Voucher> voucherList;
+    vector<pair<string, int>> keranjang;
 
-string encrypt(string text) {
-    string hasil = "";
-    for (char c : text) hasil += (char)(c + 3);
-    return hasil;
-}
-
-string decrypt(string text) {
-    string hasil = "";
-    for (char c : text) hasil += (char)(c - 3);
-    return hasil;
-}
-
-bool fileExists(string name) {
-    struct stat buffer;
-    return (stat(name.c_str(), &buffer) == 0);
-}
-
-void ensureUserFile() {
-    if (!fileExists("user.txt")) {
-        ofstream f("user.txt");
-        f << encrypt("admin") << " " << encrypt("admin123") << " " << encrypt("admin") << "\n";
-        f << encrypt("kasir") << " " << encrypt("kasir123") << " " << encrypt("kasir") << "\n";
-        f.close();
-        cout << "\n[INFO] File user.txt tidak ditemukan\n";
+    string encrypt(string text) {
+        string hasil = "";
+        for (char c : text) hasil += (char)(c + 3);
+        return hasil;
     }
-}
 
-bool login(string role) {
-    ensureUserFile();
-    ifstream f("user.txt");
-    if (!f.is_open()) {
-        cout << "Gagal membuka user.txt\n";
+    bool fileExists(string name) {
+        ifstream f(name);
+        return f.good();
+    }
+
+    void ensureUserFile() {
+        if (!fileExists("user.txt")) {
+            ofstream f("user.txt");
+
+            const string ADMIN_USER_CT = "dgplq"; 
+            const string ADMIN_PASS_CT = "dgplq456"; 
+            const string ADMIN_ROLE_CT = "dgplq"; 
+
+            const string KASIR_USER_CT = "ndvlu"; 
+            const string KASIR_PASS_CT = "ndvlu456"; 
+            const string KASIR_ROLE_CT = "ndvlu"; 
+            
+            f << ADMIN_USER_CT << " " << ADMIN_PASS_CT << " " << ADMIN_ROLE_CT << "\n";
+            f << KASIR_USER_CT << " " << KASIR_PASS_CT << " " << KASIR_ROLE_CT << "\n";
+            f.close();
+            cout << "\n[INFO] File user.txt tidak ditemukan, file dibuat otomatis.\n";
+        }
+    }
+
+    void loadMenu() {
+        menuList.clear();
+        ifstream f("stok.txt");
+        if (!f.is_open()) return;
+        MenuItem m;
+        while (f >> m.nama >> m.stok >> m.modal >> m.harga) {
+            menuList.push_back(m);
+        }
+    }
+
+    void saveMenu() {
+        ofstream f("stok.txt");
+        for (auto &m : menuList) {
+            f << m.nama << " " << m.stok << " " << m.modal << " " << m.harga << "\n";
+        }
+    }
+
+    void loadTransaksi() {
+        trxList.clear();
+        ifstream f("transaksi.txt");
+        if (!f.is_open()) return;
+        Transaksi t;
+        while (f >> t.namaMenu >> t.qty >> t.modalTotal >> t.pendapatan >> t.laba) {
+            trxList.push_back(t);
+        }
+    }
+
+    void saveTransaksi() {
+        ofstream f("transaksi.txt");
+        for (auto &t : trxList) {
+            f << t.namaMenu << " " << t.qty << " " << t.modalTotal << " "
+              << t.pendapatan << " " << t.laba << "\n";
+        }
+    }
+
+    void loadPengeluaran() {
+        pengList.clear();
+        ifstream f("pengeluaran.txt");
+        if (!f.is_open()) return;
+        Pengeluaran p;
+        while (f >> p.ket >> p.nominal) {
+            pengList.push_back(p);
+        }
+    }
+
+    void savePengeluaran() {
+        ofstream f("pengeluaran.txt");
+        for (auto &p : pengList) {
+            f << p.ket << " " << p.nominal << "\n";
+        }
+    }
+
+    void loadMember() {
+        memberList.clear();
+        ifstream f("member.txt");
+        if (!f.is_open()) return;
+        Member m;
+        while (f >> m.id >> m.nama >> m.nomor >> m.poin >> m.aktif) {
+            memberList.push_back(m);
+        }
+    }
+
+    void saveMember() {
+        ofstream f("member.txt");
+        for (auto &m : memberList) {
+            f << m.id << " " << m.nama << " " << m.nomor << " " << m.poin << " " << m.aktif << "\n";
+        }
+    }
+
+    void loadDiskon() {
+        diskonList.clear();
+        ifstream f("diskon.txt");
+        if (!f.is_open()) return;
+        Diskon d;
+        while (f >> d.kode >> d.namaMenu >> d.persen >> d.periode) {
+            diskonList.push_back(d);
+        }
+    }
+
+    void saveDiskon() {
+        ofstream f("diskon.txt");
+        for (auto &d : diskonList) {
+            f << d.kode << " " << d.namaMenu << " " << d.persen << " " << d.periode << "\n";
+        }
+    }
+
+    void loadVoucher() {
+        voucherList.clear();
+        ifstream f("voucher.txt");
+        if (!f.is_open()) return;
+        Voucher v;
+        while (f >> v.kode >> v.nominal >> v.minimalBelanja >> v.digunakan) {
+            voucherList.push_back(v);
+        }
+    }
+
+    void saveVoucher() {
+        ofstream f("voucher.txt");
+        for (auto &v : voucherList) {
+            f << v.kode << " " << v.nominal << " " << v.minimalBelanja << " " << v.digunakan << "\n";
+        }
+    }
+    
+    Member* cariMember(string id) {
+        for (auto &m : memberList) {
+            if (m.id == id) return &m;
+        }
+        return nullptr;
+    }
+
+    int hitungTotalKeranjang() {
+        int total = 0;
+        for (auto &item : keranjang) {
+            for (auto &m : menuList) {
+                if (m.nama == item.first) {
+                    total += m.harga * item.second;
+                    break;
+                }
+            }
+        }
+        return total;
+    }
+
+
+public:
+    WartegApp() {
+        loadMenu();
+        loadTransaksi();
+        loadPengeluaran();
+        loadMember();
+        loadDiskon();
+        loadVoucher();
+    }
+
+
+    bool login(string role) {
+        ensureUserFile();
+        ifstream f("user.txt");
+        if (!f.is_open()) {
+            cout << "Gagal membuka user.txt\n";
+            return false;
+        }
+
+        string u_stored_ct, p_stored_ct, r_stored_ct;
+        string inputUser, inputPass;
+
+        cout << "Username: ";
+        cin >> inputUser;
+        cout << "Password: ";
+        cin >> inputPass;
+
+        string inputUser_ct = encrypt(inputUser);
+        string inputPass_ct = encrypt(inputPass);
+        string inputRole_ct = encrypt(role);
+
+        while (f >> u_stored_ct >> p_stored_ct >> r_stored_ct) {
+            if (u_stored_ct == inputUser_ct && 
+                p_stored_ct == inputPass_ct && 
+                r_stored_ct == inputRole_ct) 
+            {
+                f.close();
+                return true;
+            }
+        }
+
+        f.close();
+        cout << "\n[LOGIN GAGAL] Username atau password salah.\n";
         return false;
     }
 
-    string u_enc, p_enc, r_enc;
-    string inputUser, inputPass;
-
-    cout << "Username: ";
-    cin >> inputUser;
-    cout << "Password: ";
-    cin >> inputPass;
-
-    while (f >> u_enc >> p_enc >> r_enc) {
-        string realUser = decrypt(u_enc);
-        string realPass = decrypt(p_enc);
-        string realRole = decrypt(r_enc);
-        if (realUser == inputUser && realPass == inputPass && realRole == role)
-            return true;
+    void kasirPencarianBarang() {
+        string cari;
+        cout << "Masukkan nama barang yang dicari: ";
+        cin >> cari;
+        bool ditemukan = false;
+        cout << "\nHasil pencarian:\n";
+        cout << "Nama\tStok\tHarga\n";
+        cout << "------------------------\n";
+        for (auto &m : menuList) {
+            if (m.nama.find(cari) != string::npos) {
+                cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
+                ditemukan = true;
+            }
+        }
+        if (!ditemukan) cout << "Barang tidak ditemukan!\n";
     }
 
-    cout << "\n[LOGIN GAGAL] Username atau password salah.\n";
-    return false;
-}
+    void kasirKategoriProduk() {
+        cout << "\n=== KATEGORI PRODUK ===\n";
+        cout << "1. Makanan Utama\n";
+        cout << "2. Lauk Pauk\n";
+        cout << "3. Sayur\n";
+        cout << "4. Minuman\n";
+        cout << "5. Lainnya\n";
+        cout << "Pilih kategori (1-5): ";
+        int kategori;
+        cin >> kategori;
 
-void loadMenu() {
-    menuList.clear();
-    ifstream f("stok.txt");
-    if (!f.is_open()) return;
-    MenuItem m;
-    while (f >> m.nama >> m.stok >> m.modal >> m.harga) {
-        menuList.push_back(m);
-    }
-}
+        vector<MenuItem> kategoriMenu;
+        for (auto &m : menuList) {
+            if (kategori == 1 && m.nama[0] >= 'A' && m.nama[0] <= 'D') kategoriMenu.push_back(m);
+            else if (kategori == 2 && m.nama[0] >= 'E' && m.nama[0] <= 'H') kategoriMenu.push_back(m);
+            else if (kategori == 3 && m.nama[0] >= 'I' && m.nama[0] <= 'L') kategoriMenu.push_back(m);
+            else if (kategori == 4 && m.nama[0] >= 'M' && m.nama[0] <= 'P') kategoriMenu.push_back(m);
+            else if (kategori == 5) kategoriMenu.push_back(m);
+        }
 
-void saveMenu() {
-    ofstream f("stok.txt");
-    for (auto &m : menuList) {
-        f << m.nama << " " << m.stok << " " << m.modal << " " << m.harga << "\n";
-    }
-}
-
-void loadTransaksi() {
-    trxList.clear();
-    ifstream f("transaksi.txt");
-    if (!f.is_open()) return;
-    Transaksi t;
-    while (f >> t.namaMenu >> t.qty >> t.modalTotal >> t.pendapatan >> t.laba) {
-        trxList.push_back(t);
-    }
-}
-
-void saveTransaksi() {
-    ofstream f("transaksi.txt");
-    for (auto &t : trxList) {
-        f << t.namaMenu << " " << t.qty << " " << t.modalTotal << " "
-          << t.pendapatan << " " << t.laba << "\n";
-    }
-}
-
-void loadPengeluaran() {
-    pengList.clear();
-    ifstream f("pengeluaran.txt");
-    if (!f.is_open()) return;
-    Pengeluaran p;
-    while (f >> p.ket >> p.nominal) {
-        pengList.push_back(p);
-    }
-}
-
-void savePengeluaran() {
-    ofstream f("pengeluaran.txt");
-    for (auto &p : pengList) {
-        f << p.ket << " " << p.nominal << "\n";
-    }
-}
-
-void loadMember() {
-    memberList.clear();
-    ifstream f("member.txt");
-    if (!f.is_open()) return;
-    Member m;
-    while (f >> m.id >> m.nama >> m.nomor >> m.poin >> m.aktif) {
-        memberList.push_back(m);
-    }
-}
-
-void saveMember() {
-    ofstream f("member.txt");
-    for (auto &m : memberList) {
-        f << m.id << " " << m.nama << " " << m.nomor << " " << m.poin << " " << m.aktif << "\n";
-    }
-}
-
-void loadDiskon() {
-    diskonList.clear();
-    ifstream f("diskon.txt");
-    if (!f.is_open()) return;
-    Diskon d;
-    while (f >> d.kode >> d.namaMenu >> d.persen >> d.periode) {
-        diskonList.push_back(d);
-    }
-}
-
-void saveDiskon() {
-    ofstream f("diskon.txt");
-    for (auto &d : diskonList) {
-        f << d.kode << " " << d.namaMenu << " " << d.persen << " " << d.periode << "\n";
-    }
-}
-
-void loadVoucher() {
-    voucherList.clear();
-    ifstream f("voucher.txt");
-    if (!f.is_open()) return;
-    Voucher v;
-    while (f >> v.kode >> v.nominal >> v.minimalBelanja >> v.digunakan) {
-        voucherList.push_back(v);
-    }
-}
-
-void saveVoucher() {
-    ofstream f("voucher.txt");
-    for (auto &v : voucherList) {
-        f << v.kode << " " << v.nominal << " " << v.minimalBelanja << " " << v.digunakan << "\n";
-    }
-}
-
-void kasirPencarianBarang() {
-    string cari;
-    cout << "Masukkan nama barang yang dicari: ";
-    cin >> cari;
-    bool ditemukan = false;
-    cout << "\nHasil pencarian:\n";
-    cout << "Nama\tStok\tHarga\n";
-    cout << "------------------------\n";
-    for (auto &m : menuList) {
-        if (m.nama.find(cari) != string::npos) {
+        cout << "\nDaftar menu kategori:\n";
+        cout << "Nama\tStok\tHarga\n";
+        for (auto &m : kategoriMenu) {
             cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
-            ditemukan = true;
         }
     }
-    if (!ditemukan) cout << "Barang tidak ditemukan!\n";
-}
 
-void kasirKategoriProduk() {
-    cout << "\n=== KATEGORI PRODUK ===\n";
-    cout << "1. Makanan Utama\n";
-    cout << "2. Lauk Pauk\n";
-    cout << "3. Sayur\n";
-    cout << "4. Minuman\n";
-    cout << "5. Lainnya\n";
-    cout << "Pilih kategori (1-5): ";
-    int kategori;
-    cin >> kategori;
+    void kasirTambahKeranjang() {
+        string nama;
+        int qty;
+        cout << "Nama barang: ";
+        cin >> nama;
+        cout << "Quantity: ";
+        cin >> qty;
 
-    vector<MenuItem> kategoriMenu;
-    for (auto &m : menuList) {
-        if (kategori == 1 && m.nama[0] >= 'A' && m.nama[0] <= 'D') kategoriMenu.push_back(m);
-        else if (kategori == 2 && m.nama[0] >= 'E' && m.nama[0] <= 'H') kategoriMenu.push_back(m);
-        else if (kategori == 3 && m.nama[0] >= 'I' && m.nama[0] <= 'L') kategoriMenu.push_back(m);
-        else if (kategori == 4 && m.nama[0] >= 'M' && m.nama[0] <= 'P') kategoriMenu.push_back(m);
-        else if (kategori == 5) kategoriMenu.push_back(m);
+        for (auto &m : menuList) {
+            if (m.nama == nama && m.stok >= qty) {
+                keranjang.push_back({nama, qty});
+                m.stok -= qty;
+                saveMenu();
+                cout << "Barang ditambahkan ke keranjang!\n";
+                return;
+            }
+        }
+        cout << "Barang tidak ditemukan atau stok tidak cukup!\n";
     }
 
-    cout << "\nDaftar menu kategori:\n";
-    cout << "Nama\tStok\tHarga\n";
-    for (auto &m : kategoriMenu) {
-        cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
-    }
-}
-
-void kasirTambahKeranjang() {
-    string nama;
-    int qty;
-    cout << "Nama barang: ";
-    cin >> nama;
-    cout << "Quantity: ";
-    cin >> qty;
-
-    for (auto &m : menuList) {
-        if (m.nama == nama && m.stok >= qty) {
-            keranjang.push_back({nama, qty});
-            m.stok -= qty;
-            saveMenu();
-            cout << "Barang ditambahkan ke keranjang!\n";
+    void kasirPembatalanBarang() {
+        if (keranjang.empty()) {
+            cout << "Keranjang kosong!\n";
             return;
         }
-    }
-    cout << "Barang tidak ditemukan atau stok tidak cukup!\n";
-}
+        cout << "Daftar keranjang:\n";
+        for (int i = 0; i < (int)keranjang.size(); i++) {
+            cout << i + 1 << ". " << keranjang[i].first << " x" << keranjang[i].second << endl;
+        }
+        int index;
+        cout << "Pilih nomor yang ingin dibatalkan: ";
+        cin >> index;
+        if (index > 0 && index <= (int)keranjang.size()) {
+            string nama = keranjang[index - 1].first;
+            int qty = keranjang[index - 1].second;
+            keranjang.erase(keranjang.begin() + index - 1);
 
-int hitungTotalKeranjang() {
-    int total = 0;
-    for (auto &item : keranjang) {
-        for (auto &m : menuList) {
-            if (m.nama == item.first) {
-                total += m.harga * item.second;
-                break;
+            for (auto &m : menuList) {
+                if (m.nama == nama) {
+                    m.stok += qty;
+                    saveMenu();
+                    break;
+                }
             }
+            cout << "Barang dibatalkan dan stok dikembalikan!\n";
+        } else {
+            cout << "Pilihan tidak valid!\n";
         }
     }
-    return total;
-}
 
-Member* cariMember(string id) {
-    for (auto &m : memberList) {
-        if (m.id == id) return &m;
-    }
-    return nullptr;
-}
-
-void kasirPembatalanBarang() {
-    if (keranjang.empty()) {
-        cout << "Keranjang kosong!\n";
-        return;
-    }
-    cout << "Daftar keranjang:\n";
-    for (int i = 0; i < (int)keranjang.size(); i++) {
-        cout << i + 1 << ". " << keranjang[i].first << " x" << keranjang[i].second << endl;
-    }
-    int index;
-    cout << "Pilih nomor yang ingin dibatalkan: ";
-    cin >> index;
-    if (index > 0 && index <= (int)keranjang.size()) {
-        string nama = keranjang[index - 1].first;
-        int qty = keranjang[index - 1].second;
-        keranjang.erase(keranjang.begin() + index - 1);
-
-        for (auto &m : menuList) {
-            if (m.nama == nama) {
-                m.stok += qty;
-                saveMenu();
-                break;
-            }
+    void kasirCekMember() {
+        string id;
+        cout << "Masukkan ID Member: ";
+        cin >> id;
+        Member* mem = cariMember(id);
+        if (mem) {
+            cout << "Nama : " << mem->nama << endl;
+            cout << "Poin : " << mem->poin << endl;
+            cout << "Status : " << (mem->aktif ? "Aktif" : "Tidak Aktif") << endl;
+        } else {
+            cout << "Member tidak ditemukan!\n";
         }
-        cout << "Barang dibatalkan dan stok dikembalikan!\n";
-    } else {
-        cout << "Pilihan tidak valid!\n";
     }
-}
 
-void kasirCekMember() {
-    string id;
-    cout << "Masukkan ID Member: ";
-    cin >> id;
-    Member* mem = cariMember(id);
-    if (mem) {
-        cout << "Nama : " << mem->nama << endl;
-        cout << "Poin : " << mem->poin << endl;
-        cout << "Status : " << (mem->aktif ? "Aktif" : "Tidak Aktif") << endl;
-    } else {
-        cout << "Member tidak ditemukan!\n";
+    void kasirMenuDiskon() {
+        cout << "\n=== DAFTAR DISKON ===\n";
+        for (auto &d : diskonList) {
+            cout << d.kode << " | " << d.namaMenu << " | " << d.persen << "% | " << d.periode << endl;
+        }
     }
-}
 
-void kasirMenuDiskon() {
-    cout << "\n=== DAFTAR DISKON ===\n";
-    for (auto &d : diskonList) {
-        cout << d.kode << " | " << d.namaMenu << " | " << d.persen << "% | " << d.periode << endl;
-    }
-}
-
-void kasirTambahMember() {
-    Member m;
-    cout << "ID Member baru: ";
-    cin >> m.id;
-    cout << "Nama: ";
-    cin >> m.nama;
-    cout << "No HP: ";
-    cin >> m.nomor;
-    m.poin = 0;
-    m.aktif = true;
-    memberList.push_back(m);
-    saveMember();
-    cout << "Member berhasil ditambahkan!\n";
-}
-
-void kasirTebusVoucher() {
-    string id;
-    cout << "ID Member: ";
-    cin >> id;
-    Member* mem = cariMember(id);
-    if (mem && mem->poin >= 100) {
-        mem->poin -= 100;
+    void kasirTambahMember() {
+        Member m;
+        cout << "ID Member baru: ";
+        cin >> m.id;
+        cout << "Nama: ";
+        cin >> m.nama;
+        cout << "No HP: ";
+        cin >> m.nomor;
+        m.poin = 0;
+        m.aktif = true;
+        memberList.push_back(m);
         saveMember();
-        Voucher v;
-        v.kode = "V" + to_string(time(nullptr));
-        v.nominal = 5000;
-        v.minimalBelanja = 20000;
-        v.digunakan = false;
-        voucherList.push_back(v);
-        saveVoucher();
-        cout << "Voucher berhasil dibuat dengan kode: " << v.kode << endl;
-    } else {
-        cout << "Poin tidak cukup atau member tidak ditemukan!\n";
-    }
-}
-
-void kasirTotalPembayaran() {
-    if (keranjang.empty()) {
-        cout << "Keranjang masih kosong!\n";
-        return;
+        cout << "Member berhasil ditambahkan!\n";
     }
 
-    int total = hitungTotalKeranjang();
-    cout << "\n=== STRUK PEMBELIAN ===\n";
-    cout << "Item\tQty\tHarga\tSubtotal\n";
-    for (auto &item : keranjang) {
-        for (auto &m : menuList) {
-            if (m.nama == item.first) {
-                int sub = m.harga * item.second;
-                cout << m.nama << "\t" << item.second << "\t" << m.harga << "\t" << sub << endl;
-            }
-        }
-    }
-    cout << "Total sebelum diskon: " << total << endl;
-
-    cout << "Apakah member? (y/n): ";
-    char c;
-    cin >> c;
-    if (c == 'y' || c == 'Y') {
+    void kasirTebusVoucher() {
         string id;
         cout << "ID Member: ";
         cin >> id;
         Member* mem = cariMember(id);
-        if (mem && mem->aktif) {
-            int diskonMember = total * 5 / 100;
-            total -= diskonMember;
-            cout << "Diskon member 5%: " << diskonMember << endl;
+        if (mem && mem->poin >= 100) {
+            mem->poin -= 100;
+            saveMember();
+            Voucher v;
+            v.kode = "V" + to_string(time(nullptr));
+            v.nominal = 5000;
+            v.minimalBelanja = 20000;
+            v.digunakan = false;
+            voucherList.push_back(v);
+            saveVoucher();
+            cout << "Voucher berhasil dibuat dengan kode: " << v.kode << endl;
         } else {
-            cout << "Member tidak ditemukan / tidak aktif.\n";
+            cout << "Poin tidak cukup atau member tidak ditemukan!\n";
         }
     }
 
-    cout << "Masukkan kode voucher (jika ada, kosongkan jika tidak): ";
-    string kode;
-    cin.ignore();
-    getline(cin, kode);
-    if (!kode.empty()) {
-        for (auto &v : voucherList) {
-            if (v.kode == kode && !v.digunakan && total >= v.minimalBelanja) {
-                total -= v.nominal;
-                v.digunakan = true;
-                saveVoucher();
-                cout << "Voucher digunakan. Potongan: " << v.nominal << endl;
-                break;
-            }
+    void kasirTotalPembayaran() {
+        if (keranjang.empty()) {
+            cout << "Keranjang masih kosong!\n";
+            return;
         }
-    }
 
-    cout << "Total akhir: " << total << endl;
-    cout << "Bayar: ";
-    int bayar;
-    cin >> bayar;
-    if (bayar >= total) {
-        cout << "Kembalian: " << bayar - total << endl;
+        int total = hitungTotalKeranjang();
+        cout << "\n=== STRUK PEMBELIAN ===\n";
+        cout << "Item\tQty\tHarga\tSubtotal\n";
         for (auto &item : keranjang) {
             for (auto &m : menuList) {
                 if (m.nama == item.first) {
-                    Transaksi t;
-                    t.namaMenu = m.nama;
-                    t.qty = item.second;
-                    t.modalTotal = m.modal * item.second;
-                    t.pendapatan = m.harga * item.second;
-                    t.laba = t.pendapatan - t.modalTotal;
-                    trxList.push_back(t);
+                    int sub = m.harga * item.second;
+                    cout << m.nama << "\t" << item.second << "\t" << m.harga << "\t" << sub << endl;
                 }
             }
         }
-        saveTransaksi();
-        keranjang.clear();
-        cout << "Transaksi selesai.\n";
-    } else {
-        cout << "Uang tidak cukup, transaksi dibatalkan.\n";
-    }
-}
+        cout << "Total sebelum diskon: " << total << endl;
 
-void kasirMenu() {
-    int pilih;
-    while (true) {
-        cout << "\n===== MENU KASIR =====\n";
-        cout << "1. Pencarian Barang\n";
-        cout << "2. Kategori Produk\n";
-        cout << "3. Tambah ke Keranjang\n";
-        cout << "4. Total & Pembayaran\n";
-        cout << "5. Pembatalan Barang\n";
-        cout << "6. Member (Cek Member)\n";
-        cout << "7. Menu Diskon\n";
-        cout << "8. Tambah Member\n";
-        cout << "9. Tebus Voucher\n";
-        cout << "10. Keluar\n";
-        cout << "Pilih: ";
-        cin >> pilih;
+        cout << "Apakah member? (y/n): ";
+        char c;
+        cin >> c;
+        if (c == 'y' || c == 'Y') {
+            string id;
+            cout << "ID Member: ";
+            cin >> id;
+            Member* mem = cariMember(id);
+            if (mem && mem->aktif) {
+                int diskonMember = total * 5 / 100;
+                total -= diskonMember;
+                cout << "Diskon member 5%: " << diskonMember << endl;
+            } else {
+                cout << "Member tidak ditemukan / tidak aktif.\n";
+            }
+        }
 
-        switch (pilih) {
-        case 1: kasirPencarianBarang(); break;
-        case 2: kasirKategoriProduk(); break;
-        case 3: kasirTambahKeranjang(); break;
-        case 4: kasirTotalPembayaran(); break;
-        case 5: kasirPembatalanBarang(); break;
-        case 6: kasirCekMember(); break;
-        case 7: kasirMenuDiskon(); break;
-        case 8: kasirTambahMember(); break;
-        case 9: kasirTebusVoucher(); break;
-        case 10:
-            cout << "Logout kasir...\n";
-            return;
-        default:
-            cout << "Pilihan tidak valid!\n";
+        cout << "Masukkan kode voucher (jika ada, kosongkan jika tidak): ";
+        string kode;
+        cin.ignore(); 
+        getline(cin, kode);
+        if (!kode.empty()) {
+            for (auto &v : voucherList) {
+                if (v.kode == kode && !v.digunakan && total >= v.minimalBelanja) {
+                    total -= v.nominal;
+                    v.digunakan = true;
+                    saveVoucher();
+                    cout << "Voucher digunakan. Potongan: " << v.nominal << endl;
+                    break;
+                }
+            }
+        }
+
+        cout << "Total akhir: " << total << endl;
+        cout << "Bayar: ";
+        int bayar;
+        cin >> bayar;
+        if (bayar >= total) {
+            cout << "Kembalian: " << bayar - total << endl;
+            for (auto &item : keranjang) {
+                for (auto &m : menuList) {
+                    if (m.nama == item.first) {
+                        Transaksi t;
+                        t.namaMenu = m.nama;
+                        t.qty = item.second;
+                        t.modalTotal = m.modal * item.second;
+                        t.pendapatan = m.harga * item.second;
+                        t.laba = t.pendapatan - t.modalTotal;
+                        trxList.push_back(t);
+                    }
+                }
+            }
+            saveTransaksi();
+            keranjang.clear();
+            cout << "Transaksi selesai.\n";
+        } else {
+            cout << "Uang tidak cukup, transaksi dibatalkan.\n";
         }
     }
-}
+    
+    void kasirMenu() {
+        int pilih;
+        while (true) {
+            cout << "\n===== MENU KASIR =====\n";
+            cout << "1. Pencarian Barang\n";
+            cout << "2. Kategori Produk\n";
+            cout << "3. Tambah ke Keranjang\n";
+            cout << "4. Total & Pembayaran\n";
+            cout << "5. Pembatalan Barang\n";
+            cout << "6. Member (Cek Member)\n";
+            cout << "7. Menu Diskon\n";
+            cout << "8. Tambah Member\n";
+            cout << "9. Tebus Voucher\n";
+            cout << "10. Keluar\n";
+            cout << "Pilih: ";
+            cin >> pilih;
 
-void adminTambahMenu() {
-    MenuItem m;
-    cout << "Nama menu: ";
-    cin >> m.nama;
-    cout << "Stok awal: ";
-    cin >> m.stok;
-    cout << "Harga modal: ";
-    cin >> m.modal;
-    cout << "Harga jual: ";
-    cin >> m.harga;
-    if (m.stok < 0 || m.modal < 0 || m.harga < 0) {
-        cout << "Input tidak valid!\n";
-        return;
-    }
-    menuList.push_back(m);
-    saveMenu();
-    cout << "Menu berhasil ditambahkan!\n";
-}
-
-void adminEditMenu() {
-    string nama;
-    cout << "Nama menu yang ingin diedit: ";
-    cin >> nama;
-    for (auto &m : menuList) {
-        if (m.nama == nama) {
-            cout << "Stok baru: ";
-            cin >> m.stok;
-            cout << "Harga modal baru: ";
-            cin >> m.modal;
-            cout << "Harga jual baru: ";
-            cin >> m.harga;
-            saveMenu();
-            cout << "Menu berhasil diperbarui!\n";
-            return;
+            switch (pilih) {
+            case 1: kasirPencarianBarang(); break;
+            case 2: kasirKategoriProduk(); break;
+            case 3: kasirTambahKeranjang(); break;
+            case 4: kasirTotalPembayaran(); break;
+            case 5: kasirPembatalanBarang(); break;
+            case 6: kasirCekMember(); break;
+            case 7: kasirMenuDiskon(); break;
+            case 8: kasirTambahMember(); break;
+            case 9: kasirTebusVoucher(); break;
+            case 10:
+                cout << "Logout kasir...\n";
+                return;
+            default:
+                cout << "Pilihan tidak valid!\n";
+            }
         }
     }
-    cout << "Menu tidak ditemukan!\n";
-}
 
-void adminHapusMenu() {
-    string nama;
-    cout << "Nama menu yang ingin dihapus: ";
-    cin >> nama;
-    for (auto it = menuList.begin(); it != menuList.end(); ++it) {
-        if (it->nama == nama) {
-            menuList.erase(it);
-            saveMenu();
-            cout << "Menu berhasil dihapus!\n";
+    void adminTambahMenu() {
+        MenuItem m;
+        cout << "Nama menu: ";
+        cin >> m.nama;
+        cout << "Stok awal: ";
+        cin >> m.stok;
+        cout << "Harga modal: ";
+        cin >> m.modal;
+        cout << "Harga jual: ";
+        cin >> m.harga;
+        if (m.stok < 0 || m.modal < 0 || m.harga < 0) {
+            cout << "Input tidak valid!\n";
             return;
         }
+        menuList.push_back(m);
+        saveMenu();
+        cout << "Menu berhasil ditambahkan!\n";
     }
-    cout << "Menu tidak ditemukan!\n";
-}
 
-void adminTambahPengeluaran() {
-    Pengeluaran p;
-    cout << "Keterangan pengeluaran (tanpa spasi): ";
-    cin >> p.ket;
-    cout << "Nominal: ";
-    cin >> p.nominal;
-    pengList.push_back(p);
-    savePengeluaran();
-    cout << "Pengeluaran berhasil dicatat!\n";
-}
-
-void adminLaporan() {
-    int totalModal = 0, totalPendapatan = 0, totalLabaKotor = 0, totalPengeluaran = 0;
-    for (auto &t : trxList) {
-        totalModal += t.modalTotal;
-        totalPendapatan += t.pendapatan;
-        totalLabaKotor += t.laba;
+    void adminEditMenu() {
+        string nama;
+        cout << "Nama menu yang ingin diedit: ";
+        cin >> nama;
+        for (auto &m : menuList) {
+            if (m.nama == nama) {
+                cout << "Stok baru: ";
+                cin >> m.stok;
+                cout << "Harga modal baru: ";
+                cin >> m.modal;
+                cout << "Harga jual baru: ";
+                cin >> m.harga;
+                saveMenu();
+                cout << "Menu berhasil diperbarui!\n";
+                return;
+            }
+        }
+        cout << "Menu tidak ditemukan!\n";
     }
-    for (auto &p : pengList) {
-        totalPengeluaran += p.nominal;
-    }
-    cout << "\n======== LAPORAN WARTEG ========\n";
-    cout << "Total Modal: " << totalModal << endl;
-    cout << "Total Pendapatan: " << totalPendapatan << endl;
-    cout << "Laba Kotor: " << totalLabaKotor << endl;
-    cout << "Pengeluaran: " << totalPengeluaran << endl;
-    cout << "Laba Bersih: " << totalLabaKotor - totalPengeluaran << endl;
-}
 
-void adminExportLaporan() {
-    ofstream f("laporan.txt");
-    int totalModal = 0, totalPendapatan = 0, totalLabaKotor = 0, totalPengeluaran = 0;
-    for (auto &t : trxList) {
-        totalModal += t.modalTotal;
-        totalPendapatan += t.pendapatan;
-        totalLabaKotor += t.laba;
+    void adminHapusMenu() {
+        string nama;
+        cout << "Nama menu yang ingin dihapus: ";
+        cin >> nama;
+        for (auto it = menuList.begin(); it != menuList.end(); ++it) {
+            if (it->nama == nama) {
+                menuList.erase(it);
+                saveMenu();
+                cout << "Menu berhasil dihapus!\n";
+                return;
+            }
+        }
+        cout << "Menu tidak ditemukan!\n";
     }
-    for (auto &p : pengList) {
-        totalPengeluaran += p.nominal;
+
+    void adminTambahPengeluaran() {
+        Pengeluaran p;
+        cout << "Keterangan pengeluaran (tanpa spasi): ";
+        cin >> p.ket;
+        cout << "Nominal: ";
+        cin >> p.nominal;
+        pengList.push_back(p);
+        savePengeluaran();
+        cout << "Pengeluaran berhasil dicatat!\n";
     }
-    f << "Total Modal: " << totalModal << "\n";
-    f << "Total Pendapatan: " << totalPendapatan << "\n";
-    f << "Laba Kotor: " << totalLabaKotor << "\n";
-    f << "Pengeluaran: " << totalPengeluaran << "\n";
-    f << "Laba Bersih: " << totalLabaKotor - totalPengeluaran << "\n";
-    f.close();
-    cout << "Laporan berhasil diekspor ke laporan.txt\n";
-}
 
-void adminTambahUser() {
-    string user, pass, role;
-    cout << "Username baru: ";
-    cin >> user;
-    cout << "Password baru: ";
-    cin >> pass;
-    cout << "Role (admin/kasir): ";
-    cin >> role;
-    ofstream f("user.txt", ios::app);
-    f << encrypt(user) << " " << encrypt(pass) << " " << encrypt(role) << "\n";
-    f.close();
-    cout << "User berhasil ditambahkan!\n";
-}
+    void adminLaporan() {
+        int totalModal = 0, totalPendapatan = 0, totalLabaKotor = 0, totalPengeluaran = 0;
+        for (auto &t : trxList) {
+            totalModal += t.modalTotal;
+            totalPendapatan += t.pendapatan;
+            totalLabaKotor += t.laba;
+        }
+        for (auto &p : pengList) {
+            totalPengeluaran += p.nominal;
+        }
+        cout << "\n======== LAPORAN WARTEG ========\n";
+        cout << "Total Modal: " << totalModal << endl;
+        cout << "Total Pendapatan: " << totalPendapatan << endl;
+        cout << "Laba Kotor: " << totalLabaKotor << endl;
+        cout << "Pengeluaran: " << totalPengeluaran << endl;
+        cout << "Laba Bersih: " << totalLabaKotor - totalPengeluaran << endl;
+    }
 
-void adminEditMember() {
-    string id;
-    cout << "ID Member yang ingin diedit: ";
-    cin >> id;
-    for (auto &m : memberList) {
-        if (m.id == id) {
-            cout << "Nama baru: ";
-            cin >> m.nama;
-            cout << "No HP baru: ";
-            cin >> m.nomor;
-            cout << "Poin baru: ";
-            cin >> m.poin;
-            cout << "Aktif (1 aktif, 0 nonaktif): ";
-            cin >> m.aktif;
-            saveMember();
-            cout << "Data member diperbarui.\n";
-            return;
+    void adminExportLaporan() {
+        ofstream f("laporan.txt");
+        int totalModal = 0, totalPendapatan = 0, totalLabaKotor = 0, totalPengeluaran = 0;
+        for (auto &t : trxList) {
+            totalModal += t.modalTotal;
+            totalPendapatan += t.pendapatan;
+            totalLabaKotor += t.laba;
+        }
+        for (auto &p : pengList) {
+            totalPengeluaran += p.nominal;
+        }
+        f << "Total Modal: " << totalModal << "\n";
+        f << "Total Pendapatan: " << totalPendapatan << "\n";
+        f << "Laba Kotor: " << totalLabaKotor << "\n";
+        f << "Pengeluaran: " << totalPengeluaran << "\n";
+        f << "Laba Bersih: " << totalLabaKotor - totalPengeluaran << "\n";
+        f.close();
+        cout << "Laporan berhasil diekspor ke laporan.txt\n";
+    }
+
+    void adminTambahUser() {
+        string user, pass, role;
+        cout << "Username baru: ";
+        cin >> user;
+        cout << "Password baru: ";
+        cin >> pass;
+        cout << "Role (admin/kasir): ";
+        cin >> role;
+        
+        ofstream f("user.txt", ios::app);
+        f << encrypt(user) << " " << encrypt(pass) << " " << encrypt(role) << "\n";
+        f.close();
+        cout << "User berhasil ditambahkan!\n";
+    }
+
+    void adminEditMember() {
+        string id;
+        cout << "ID Member yang ingin diedit: ";
+        cin >> id;
+        for (auto &m : memberList) {
+            if (m.id == id) {
+                cout << "Nama baru: ";
+                cin >> m.nama;
+                cout << "No HP baru: ";
+                cin >> m.nomor;
+                cout << "Poin baru: ";
+                cin >> m.poin;
+                cout << "Aktif (1 aktif, 0 nonaktif): ";
+                cin >> m.aktif;
+                saveMember();
+                cout << "Data member diperbarui.\n";
+                return;
+            }
+        }
+        cout << "Member tidak ditemukan!\n";
+    }
+
+    void adminBuatDiskon() {
+        Diskon d;
+        cout << "Kode diskon: ";
+        cin >> d.kode;
+        cout << "Nama menu yang didiskon: ";
+        cin >> d.namaMenu;
+        cout << "Persentase diskon: ";
+        cin >> d.persen;
+        cout << "Periode: ";
+        cin >> d.periode;
+        diskonList.push_back(d);
+        saveDiskon();
+        cout << "Diskon berhasil dibuat.\n";
+    }
+
+    void adminBuatVoucher() {
+        Voucher v;
+        cout << "Kode voucher: ";
+        cin >> v.kode;
+        cout << "Nominal potongan: ";
+        cin >> v.nominal;
+        cout << "Minimal belanja: ";
+        cin >> v.minimalBelanja;
+        v.digunakan = false;
+        voucherList.push_back(v);
+        saveVoucher();
+        cout << "Voucher berhasil dibuat.\n";
+    }
+
+    void adminMenu() {
+        int pilih;
+        while (true) {
+            cout << "\n===== MENU ADMIN =====\n";
+            cout << "1. Tambah Menu\n";
+            cout << "2. Edit Menu\n";
+            cout << "3. Hapus Menu\n";
+            cout << "4. Tambah Pengeluaran\n";
+            cout << "5. Lihat Laporan\n";
+            cout << "6. Export Laporan\n";
+            cout << "7. Tambah User\n";
+            cout << "8. Edit Member\n";
+            cout << "9. Buat Diskon\n";
+            cout << "10. Buat Kode Voucher\n";
+            cout << "11. Keluar\n";
+            cout << "Pilih: ";
+            cin >> pilih;
+
+            switch (pilih) {
+            case 1: adminTambahMenu(); break;
+            case 2: adminEditMenu(); break;
+            case 3: adminHapusMenu(); break;
+            case 4: adminTambahPengeluaran(); break;
+            case 5: adminLaporan(); break;
+            case 6: adminExportLaporan(); break;
+            case 7: adminTambahUser(); break;
+            case 8: adminEditMember(); break;
+            case 9: adminBuatDiskon(); break;
+            case 10: adminBuatVoucher(); break;
+            case 11:
+                cout << "Logout admin...\n";
+                return;
+            default:
+                cout << "Pilihan tidak valid!\n";
+            }
         }
     }
-    cout << "Member tidak ditemukan!\n";
-}
+};
 
-void adminBuatDiskon() {
-    Diskon d;
-    cout << "Kode diskon: ";
-    cin >> d.kode;
-    cout << "Nama menu yang didiskon: ";
-    cin >> d.namaMenu;
-    cout << "Persentase diskon: ";
-    cin >> d.persen;
-    cout << "Periode: ";
-    cin >> d.periode;
-    diskonList.push_back(d);
-    saveDiskon();
-    cout << "Diskon berhasil dibuat.\n";
-}
-
-void adminBuatVoucher() {
-    Voucher v;
-    cout << "Kode voucher: ";
-    cin >> v.kode;
-    cout << "Nominal potongan: ";
-    cin >> v.nominal;
-    cout << "Minimal belanja: ";
-    cin >> v.minimalBelanja;
-    v.digunakan = false;
-    voucherList.push_back(v);
-    saveVoucher();
-    cout << "Voucher berhasil dibuat.\n";
-}
-
-void adminMenu() {
-    int pilih;
-    while (true) {
-        cout << "\n===== MENU ADMIN =====\n";
-        cout << "1. Tambah Menu\n";
-        cout << "2. Edit Menu\n";
-        cout << "3. Hapus Menu\n";
-        cout << "4. Tambah Pengeluaran\n";
-        cout << "5. Lihat Laporan\n";
-        cout << "6. Export Laporan\n";
-        cout << "7. Tambah User\n";
-        cout << "8. Edit Member\n";
-        cout << "9. Buat Diskon\n";
-        cout << "10. Buat Kode Voucher\n";
-        cout << "11. Keluar\n";
-        cout << "Pilih: ";
-        cin >> pilih;
-
-        switch (pilih) {
-        case 1: adminTambahMenu(); break;
-        case 2: adminEditMenu(); break;
-        case 3: adminHapusMenu(); break;
-        case 4: adminTambahPengeluaran(); break;
-        case 5: adminLaporan(); break;
-        case 6: adminExportLaporan(); break;
-        case 7: adminTambahUser(); break;
-        case 8: adminEditMember(); break;
-        case 9: adminBuatDiskon(); break;
-        case 10: adminBuatVoucher(); break;
-        case 11:
-            cout << "Logout admin...\n";
-            return;
-        default:
-            cout << "Pilihan tidak valid!\n";
-        }
-    }
-}
 
 int main() {
-    loadMenu();
-    loadTransaksi();
-    loadPengeluaran();
-    loadMember();
-    loadDiskon();
-    loadVoucher();
+    WartegApp app; 
 
     int pilihRole;
     cout << "===== APLIKASI WARTEG =====\n";
@@ -722,13 +752,19 @@ int main() {
     cout << "2. Login sebagai Kasir\n";
     cout << "3. Keluar\n";
     cout << "Pilih: ";
-    cin >> pilihRole;
+    
+    if (!(cin >> pilihRole)) {
+        cout << "Input tidak valid.\n";
+        return 1;
+    }
 
     if (pilihRole == 1) {
-        if (login("admin")) adminMenu();
+        if (app.login("admin")) {
+            app.adminMenu();
+        }
         else cout << "Login admin gagal.\n";
     } else if (pilihRole == 2) {
-        if (login("kasir")) kasirMenu();
+        if (app.login("kasir")) app.kasirMenu();
         else cout << "Login kasir gagal.\n";
     } else if (pilihRole == 3) {
         cout << "Keluar dari program...\n";
