@@ -2,12 +2,13 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <algorithm>
 #include <utility>
 #include <cstdlib>
+#include <sys/stat.h> // Diperlukan untuk struct stat
 
 using namespace std;
 
+// Fungsi helper untuk membersihkan layar
 void clearScreen() {
     #ifdef _WIN32
     system("cls");
@@ -16,11 +17,13 @@ void clearScreen() {
     #endif
 }
 
+// MODIFIKASI 1: Menambahkan field kategori
 struct MenuItem {
     string nama;
     int stok;
     int modal;
     int harga;
+    string kategori; // Tambahan agar pengelompokan akurat
 };
 
 struct Transaksi {
@@ -75,14 +78,15 @@ private:
     }
 
     bool fileExists(string name) {
-        ifstream f(name);
-        return f.good();
+        struct stat buffer;
+        return (stat(name.c_str(), &buffer) == 0);
     }
 
     void ensureUserFile() {
         if (!fileExists("user.txt")) {
             ofstream f("user.txt");
 
+            // Password sesuai perbaikan sebelumnya (dgplq456 untuk admin123)
             const string ADMIN_USER_CT = "dgplq"; 
             const string ADMIN_PASS_CT = "dgplq456"; 
             const string ADMIN_ROLE_CT = "dgplq"; 
@@ -98,20 +102,24 @@ private:
         }
     }
 
+    // MODIFIKASI 2: Update loadMenu untuk membaca kategori
     void loadMenu() {
         menuList.clear();
         ifstream f("stok.txt");
         if (!f.is_open()) return;
         MenuItem m;
-        while (f >> m.nama >> m.stok >> m.modal >> m.harga) {
+        // Baca data kategori juga
+        while (f >> m.nama >> m.stok >> m.modal >> m.harga >> m.kategori) {
             menuList.push_back(m);
         }
     }
 
+    // MODIFIKASI 3: Update saveMenu untuk menyimpan kategori
     void saveMenu() {
         ofstream f("stok.txt");
         for (auto &m : menuList) {
-            f << m.nama << " " << m.stok << " " << m.modal << " " << m.harga << "\n";
+            // Simpan kategori ke file
+            f << m.nama << " " << m.stok << " " << m.modal << " " << m.harga << " " << m.kategori << "\n";
         }
     }
 
@@ -274,42 +282,54 @@ public:
         cin >> cari;
         bool ditemukan = false;
         cout << "\nHasil pencarian:\n";
-        cout << "Nama\tStok\tHarga\n";
-        cout << "------------------------\n";
+        cout << "Nama\tStok\tHarga\tKategori\n"; // Ditambah info kategori
+        cout << "------------------------------------\n";
         for (auto &m : menuList) {
             if (m.nama.find(cari) != string::npos) {
-                cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
+                cout << m.nama << "\t" << m.stok << "\t" << m.harga << "\t" << m.kategori << endl;
                 ditemukan = true;
             }
         }
         if (!ditemukan) cout << "Barang tidak ditemukan!\n";
     }
 
+    // MODIFIKASI 4: Perbaikan total logika Kategori agar menu baru pasti muncul
     void kasirKategoriProduk() {
         cout << "\n=== KATEGORI PRODUK ===\n";
-        cout << "1. Makanan Utama\n";
-        cout << "2. Lauk Pauk\n";
-        cout << "3. Sayur\n";
-        cout << "4. Minuman\n";
+        cout << "1. Makanan\n";
+        cout << "2. Minuman\n";
+        cout << "3. Lauk\n";
+        cout << "4. Sayur\n";
         cout << "5. Lainnya\n";
         cout << "Pilih kategori (1-5): ";
         int kategori;
         cin >> kategori;
 
-        vector<MenuItem> kategoriMenu;
-        for (auto &m : menuList) {
-            if (kategori == 1 && m.nama[0] >= 'A' && m.nama[0] <= 'D') kategoriMenu.push_back(m);
-            else if (kategori == 2 && m.nama[0] >= 'E' && m.nama[0] <= 'H') kategoriMenu.push_back(m);
-            else if (kategori == 3 && m.nama[0] >= 'I' && m.nama[0] <= 'L') kategoriMenu.push_back(m);
-            else if (kategori == 4 && m.nama[0] >= 'M' && m.nama[0] <= 'P') kategoriMenu.push_back(m);
-            else if (kategori == 5) kategoriMenu.push_back(m);
+        // Mapping angka ke string kategori
+        string filterKategori = "";
+        if (kategori == 1) filterKategori = "Makanan";
+        else if (kategori == 2) filterKategori = "Minuman";
+        else if (kategori == 3) filterKategori = "Lauk";
+        else if (kategori == 4) filterKategori = "Sayur";
+        else if (kategori == 5) filterKategori = "Lainnya";
+        else {
+            cout << "Pilihan tidak valid!\n";
+            return;
         }
 
-        cout << "\nDaftar menu kategori:\n";
+        cout << "\nDaftar menu kategori " << filterKategori << ":\n";
         cout << "Nama\tStok\tHarga\n";
-        for (auto &m : kategoriMenu) {
-            cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
+        bool ada = false;
+        
+        for (auto &m : menuList) {
+            // Sekarang membandingkan string kategori, bukan huruf depan nama
+            if (m.kategori == filterKategori) {
+                cout << m.nama << "\t" << m.stok << "\t" << m.harga << endl;
+                ada = true;
+            }
         }
+        
+        if (!ada) cout << "(Tidak ada menu di kategori ini)\n";
     }
 
     void kasirTambahKeranjang() {
@@ -501,6 +521,7 @@ public:
     void kasirMenu() {
         int pilih;
         while (true) {
+            // clearScreen(); // Opsional
             cout << "\n===== MENU KASIR =====\n";
             cout << "1. Pencarian Barang\n";
             cout << "2. Kategori Produk\n";
@@ -534,9 +555,10 @@ public:
         }
     }
 
+    // MODIFIKASI 5: Update tambah menu agar Admin memilih kategori
     void adminTambahMenu() {
         MenuItem m;
-        cout << "Nama menu: ";
+        cout << "Nama menu (tanpa spasi): ";
         cin >> m.nama;
         cout << "Stok awal: ";
         cin >> m.stok;
@@ -544,13 +566,27 @@ public:
         cin >> m.modal;
         cout << "Harga jual: ";
         cin >> m.harga;
+        
+        // Pilih Kategori
+        cout << "Pilih Kategori:\n";
+        cout << "1. Makanan\n2. Minuman\n3. Lauk\n4. Sayur\n5. Lainnya\n";
+        cout << "Pilih (1-5): ";
+        int kat;
+        cin >> kat;
+        
+        if (kat == 1) m.kategori = "Makanan";
+        else if (kat == 2) m.kategori = "Minuman";
+        else if (kat == 3) m.kategori = "Lauk";
+        else if (kat == 4) m.kategori = "Sayur";
+        else m.kategori = "Lainnya";
+
         if (m.stok < 0 || m.modal < 0 || m.harga < 0) {
             cout << "Input tidak valid!\n";
             return;
         }
         menuList.push_back(m);
         saveMenu();
-        cout << "Menu berhasil ditambahkan!\n";
+        cout << "Menu berhasil ditambahkan ke kategori " << m.kategori << "!\n";
     }
 
     void adminEditMenu() {
@@ -565,6 +601,20 @@ public:
                 cin >> m.modal;
                 cout << "Harga jual baru: ";
                 cin >> m.harga;
+                
+                // Opsional: Edit kategori
+                cout << "Edit Kategori? (y/n): ";
+                char c; cin >> c;
+                if(c == 'y' || c == 'Y'){
+                    cout << "1. Makanan\n2. Minuman\n3. Lauk\n4. Sayur\n5. Lainnya\nPilih: ";
+                    int kat; cin >> kat;
+                    if (kat == 1) m.kategori = "Makanan";
+                    else if (kat == 2) m.kategori = "Minuman";
+                    else if (kat == 3) m.kategori = "Lauk";
+                    else if (kat == 4) m.kategori = "Sayur";
+                    else m.kategori = "Lainnya";
+                }
+
                 saveMenu();
                 cout << "Menu berhasil diperbarui!\n";
                 return;
@@ -759,9 +809,7 @@ int main() {
     }
 
     if (pilihRole == 1) {
-        if (app.login("admin")) {
-            app.adminMenu();
-        }
+        if (app.login("admin")) app.adminMenu();
         else cout << "Login admin gagal.\n";
     } else if (pilihRole == 2) {
         if (app.login("kasir")) app.kasirMenu();
